@@ -413,3 +413,151 @@ async def test_scroll_direction_down() -> None:
             assert result.error is None
         finally:
             await browser.close()
+
+
+async def test_assert_visible_success() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<button id="btn">OK</button>')
+            ex = Executor(page)
+            result = await ex.assert_visible("#btn")
+            assert result.success is True
+            assert result.action == "assert_visible"
+            assert result.selector == "#btn"
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_assert_visible_hidden() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<button id="btn" style="display:none">OK</button>')
+            ex = Executor(page)
+            result = await ex.assert_visible("#btn")
+            assert result.success is False
+            assert result.action == "assert_visible"
+            assert result.selector == "#btn"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_assert_visible_missing() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.assert_visible("#does-not-exist")
+            assert result.success is False
+            assert result.action == "assert_visible"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_assert_text_success() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<p id="msg">  Hello world  </p>')
+            ex = Executor(page)
+            result = await ex.assert_text("#msg", "Hello world")
+            assert result.success is True
+            assert result.action == "assert_text"
+            assert result.selector == "#msg"
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_assert_text_mismatch() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<p id="msg">Actual text</p>')
+            ex = Executor(page)
+            result = await ex.assert_text("#msg", "Expected text")
+            assert result.success is False
+            assert result.action == "assert_text"
+            assert result.selector == "#msg"
+            assert result.error is not None
+            assert "Actual text" in result.error
+        finally:
+            await browser.close()
+
+
+async def test_assert_text_missing_selector() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            page.set_default_timeout(2000)
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.assert_text("#does-not-exist", "anything")
+            assert result.success is False
+            assert result.action == "assert_text"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_assert_url_success() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.assert_url("about:blank")
+            assert result.success is True
+            assert result.action == "assert_url"
+            assert result.selector is None
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_assert_url_substring_match() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.assert_url("blank")
+            assert result.success is True
+            assert result.action == "assert_url"
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_assert_url_failure() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.assert_url("https://example.com")
+            assert result.success is False
+            assert result.action == "assert_url"
+            assert result.selector is None
+            assert result.error is not None
+            assert "about:blank" in result.error
+        finally:
+            await browser.close()

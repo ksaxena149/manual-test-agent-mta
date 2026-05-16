@@ -3,7 +3,8 @@
 ActionResult shape:
     success: bool        — True if the action completed without error
     action: str          — action name: "navigate" | "click" | "type" | "select" |
-                           "scroll" | "wait" | "check" | "uncheck" | "upload"
+                           "scroll" | "wait" | "check" | "uncheck" | "upload" |
+                           "assert_visible" | "assert_text" | "assert_url"
     selector: str | None — CSS/text selector used; None for navigate and ms-form wait
     duration_ms: float   — wall-clock time for the action in milliseconds
     error: str | None    — error message on failure; None on success
@@ -227,6 +228,82 @@ class Executor:
                 duration_ms=(time.monotonic() - t0) * 1000,
                 error=str(exc),
             )
+
+    async def assert_visible(self, selector: str) -> ActionResult:
+        t0 = time.monotonic()
+        try:
+            visible = await self._page.locator(selector).is_visible()
+            if not visible:
+                return ActionResult(
+                    success=False,
+                    action="assert_visible",
+                    selector=selector,
+                    duration_ms=(time.monotonic() - t0) * 1000,
+                    error=f"element '{selector}' is not visible",
+                )
+            return ActionResult(
+                success=True,
+                action="assert_visible",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=None,
+            )
+        except Exception as exc:
+            return ActionResult(
+                success=False,
+                action="assert_visible",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=str(exc),
+            )
+
+    async def assert_text(self, selector: str, expected: str) -> ActionResult:
+        t0 = time.monotonic()
+        try:
+            actual = (await self._page.locator(selector).inner_text()).strip()
+            if actual != expected:
+                return ActionResult(
+                    success=False,
+                    action="assert_text",
+                    selector=selector,
+                    duration_ms=(time.monotonic() - t0) * 1000,
+                    error=f"expected '{expected}', got '{actual}'",
+                )
+            return ActionResult(
+                success=True,
+                action="assert_text",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=None,
+            )
+        except Exception as exc:
+            return ActionResult(
+                success=False,
+                action="assert_text",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=str(exc),
+            )
+
+    async def assert_url(self, expected: str) -> ActionResult:
+        """Passes when the current page URL contains `expected` as a substring."""
+        t0 = time.monotonic()
+        actual = self._page.url
+        if expected not in actual:
+            return ActionResult(
+                success=False,
+                action="assert_url",
+                selector=None,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=f"expected URL to contain '{expected}', got '{actual}'",
+            )
+        return ActionResult(
+            success=True,
+            action="assert_url",
+            selector=None,
+            duration_ms=(time.monotonic() - t0) * 1000,
+            error=None,
+        )
 
     async def click(self, selector: str) -> ActionResult:
         t0 = time.monotonic()
