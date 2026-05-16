@@ -7,7 +7,7 @@ name = "mta"
 version = "0.1.0"
 requires-python = ">=3.11"
 description = "Manual Test Agent — hybrid browser testing with LLM-driven author, deterministic replay, and targeted heal"
-dependencies = ["anthropic>=0.102.0", "httpx>=0.27"]
+dependencies = ["anthropic>=0.102.0", "httpx>=0.27", "playwright>=1.40"]
 
 [project.scripts]
 mta = "mta.cli:main"
@@ -17,6 +17,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 src = ["src"]
