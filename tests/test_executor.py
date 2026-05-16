@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from playwright.async_api import async_playwright
 
 from mta.executor import Executor
@@ -178,5 +180,236 @@ async def test_navigate_failure() -> None:
             assert result.action == "navigate"
             assert result.selector is None
             assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_upload_success(tmp_path: Path) -> None:
+    tmp_file = tmp_path / "test.txt"
+    tmp_file.write_text("hello")
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<input type="file" id="file">')
+            ex = Executor(page)
+            result = await ex.upload("#file", str(tmp_file))
+            assert result.success is True
+            assert result.action == "upload"
+            assert result.selector == "#file"
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_upload_missing_selector(tmp_path: Path) -> None:
+    tmp_file = tmp_path / "test.txt"
+    tmp_file.write_text("hello")
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            page.set_default_timeout(2000)
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.upload("#does-not-exist", str(tmp_file))
+            assert result.success is False
+            assert result.action == "upload"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_check_success() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<input type="checkbox" id="cb">')
+            ex = Executor(page)
+            result = await ex.check("#cb")
+            assert result.success is True
+            assert result.action == "check"
+            assert result.selector == "#cb"
+            assert result.error is None
+            checked = await page.evaluate("document.getElementById('cb').checked")
+            assert checked is True
+        finally:
+            await browser.close()
+
+
+async def test_check_missing_selector() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            page.set_default_timeout(2000)
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.check("#does-not-exist")
+            assert result.success is False
+            assert result.action == "check"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_uncheck_success() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<input type="checkbox" id="cb" checked>')
+            ex = Executor(page)
+            result = await ex.uncheck("#cb")
+            assert result.success is True
+            assert result.action == "uncheck"
+            assert result.selector == "#cb"
+            assert result.error is None
+            checked = await page.evaluate("document.getElementById('cb').checked")
+            assert checked is False
+        finally:
+            await browser.close()
+
+
+async def test_uncheck_missing_selector() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            page.set_default_timeout(2000)
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.uncheck("#does-not-exist")
+            assert result.success is False
+            assert result.action == "uncheck"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_wait_ms_int() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.wait(50)
+            assert result.success is True
+            assert result.action == "wait"
+            assert result.selector is None
+            assert result.duration_ms >= 50
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_wait_ms_string() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.wait("50")
+            assert result.success is True
+            assert result.action == "wait"
+            assert result.selector is None
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_wait_selector_visible() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content('<button id="btn">OK</button>')
+            ex = Executor(page)
+            result = await ex.wait("#btn")
+            assert result.success is True
+            assert result.action == "wait"
+            assert result.selector == "#btn"
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_wait_selector_missing() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            page.set_default_timeout(2000)
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.wait("#does-not-exist")
+            assert result.success is False
+            assert result.action == "wait"
+            assert result.selector == "#does-not-exist"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_scroll_selector() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content(
+                '<div id="target" style="margin-top:2000px">Target</div>'
+            )
+            ex = Executor(page)
+            result = await ex.scroll("#target")
+            assert result.success is True
+            assert result.action == "scroll"
+            assert result.selector == "#target"
+            assert result.error is None
+        finally:
+            await browser.close()
+
+
+async def test_scroll_missing_selector() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            page.set_default_timeout(2000)
+            await page.goto("about:blank")
+            ex = Executor(page)
+            result = await ex.scroll("#does-not-exist")
+            assert result.success is False
+            assert result.action == "scroll"
+            assert result.error is not None
+        finally:
+            await browser.close()
+
+
+async def test_scroll_direction_down() -> None:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("about:blank")
+            await page.set_content(
+                '<div style="height:5000px">tall page</div>'
+            )
+            ex = Executor(page)
+            result = await ex.scroll("down")
+            assert result.success is True
+            assert result.action == "scroll"
+            assert result.selector == "down"
+            assert result.duration_ms > 0
+            assert result.error is None
         finally:
             await browser.close()
