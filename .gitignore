@@ -12,3 +12,4 @@ build/
 *.mta.json.new
 .mta/
 .env
+docs/
