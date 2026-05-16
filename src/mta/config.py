@@ -26,6 +26,8 @@ class Config:
     max_retries: int = 2
     heal_mode: str = "auto"
     browser: BrowserConfig = field(default_factory=BrowserConfig)
+    anthropic_api_key: str | None = None
+    openrouter_api_key: str | None = None
 
 
 def load_config(project_root: Path | None = None) -> Config:
@@ -85,10 +87,35 @@ def load_config(project_root: Path | None = None) -> Config:
         headless=raw_headless if isinstance(raw_headless, bool) else None
     )
 
+    anthropic_api_key, openrouter_api_key = _load_api_keys(root)
+
     return Config(
         default_model=default_model,
         model_roles=model_roles,
         max_retries=max_retries,
         heal_mode=heal_mode,
         browser=browser,
+        anthropic_api_key=anthropic_api_key,
+        openrouter_api_key=openrouter_api_key,
     )
+
+
+def _load_api_keys(root: Path) -> tuple[str | None, str | None]:
+    env_path = root / ".env"
+    if not env_path.exists():
+        return None, None
+
+    env: dict[str, str] = {}
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("\"'")
+        if key:
+            env[key] = value
+
+    return env.get("ANTHROPIC_API_KEY"), env.get("OPENROUTER_API_KEY")
