@@ -1,0 +1,23 @@
+# MTA configuration — copy to mta.config.toml and customise.
+# API keys go in .env (see .env.example), NOT here.
+
+# Retry each action up to this many times before triggering heal (default: 2).
+max_retries = 2
+
+# Heal behaviour: "auto" silently updates the cache; "interactive" prompts you.
+heal_mode = "auto"
+
+[model]
+# Required. Default model used for all roles unless overridden below.
+default = "claude-sonnet-4-6"
+
+[model.roles]
+# Optional per-role overrides. Remove any line to fall back to model.default.
+author = "claude-sonnet-4-6"
+vision = "claude-sonnet-4-6"
+heal   = "claude-haiku-4-5-20251001"
+
+[browser]
+# Optional. true = always headless, false = always headed.
+# Omit to let MTA auto-detect (headless in CI, headed when DISPLAY is set).
+# headless = false
