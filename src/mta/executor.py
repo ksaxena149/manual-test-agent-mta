@@ -2,7 +2,7 @@
 
 ActionResult shape:
     success: bool        — True if the action completed without error
-    action: str          — action name: "navigate" | "click"
+    action: str          — action name: "navigate" | "click" | "type" | "select"
     selector: str | None — CSS/text selector used; None for navigate
     duration_ms: float   — wall-clock time for the action in milliseconds
     error: str | None    — error message on failure; None on success
@@ -46,6 +46,46 @@ class Executor:
                 success=False,
                 action="navigate",
                 selector=None,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=str(exc),
+            )
+
+    async def type(self, selector: str, text: str) -> ActionResult:
+        t0 = time.monotonic()
+        try:
+            await self._page.locator(selector).fill(text)
+            return ActionResult(
+                success=True,
+                action="type",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=None,
+            )
+        except Exception as exc:
+            return ActionResult(
+                success=False,
+                action="type",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=str(exc),
+            )
+
+    async def select(self, selector: str, value: str) -> ActionResult:
+        t0 = time.monotonic()
+        try:
+            await self._page.locator(selector).select_option(value=value)
+            return ActionResult(
+                success=True,
+                action="select",
+                selector=selector,
+                duration_ms=(time.monotonic() - t0) * 1000,
+                error=None,
+            )
+        except Exception as exc:
+            return ActionResult(
+                success=False,
+                action="select",
+                selector=selector,
                 duration_ms=(time.monotonic() - t0) * 1000,
                 error=str(exc),
             )
