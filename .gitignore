@@ -12,4 +12,5 @@ build/
 *.mta.json.new
 .mta/
 .env
+mta.config.toml
 docs/

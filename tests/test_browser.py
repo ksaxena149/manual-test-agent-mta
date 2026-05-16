@@ -1,4 +1,3 @@
-import pytest
 from mta.browser import _resolve_headless, launch_browser
 from mta.config import BrowserConfig, Config, ModelRoles
 
