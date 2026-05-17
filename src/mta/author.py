@@ -15,11 +15,12 @@ DriftError from the executor propagates up — AuthorMode does not catch it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from playwright.async_api import Page
 
+from mta.anchor import SemanticAnchor
 from mta.arbiter import Arbiter, Step
 from mta.executor import ActionResult, Executor
 from mta.llm.client import LLMClient
@@ -38,6 +39,15 @@ class Result:
     channel: str  # "snapshot-direct" | "snapshot-llm" | "vision-llm"
     action: Action
     action_result: ActionResult
+    semantic_anchor: dict[str, str] = field(default_factory=dict)
+
+
+def _selector_from_action(action: Action) -> str | None:
+    """Return the selector arg from an action, or None if the action has no selector."""
+    args = action.args
+    if "selector" in args and isinstance(args["selector"], str):
+        return args["selector"]
+    return None
 
 
 async def _dispatch(executor: Executor, action: Action) -> ActionResult:
@@ -91,7 +101,14 @@ class AuthorMode:
                     args={"selector": candidate.element["selector"]},
                 )
                 action_result = await _dispatch(executor, action)
-                return Result(channel="snapshot-direct", action=action, action_result=action_result)
+                sel = _selector_from_action(action)
+                anchor = await SemanticAnchor.extract(page, sel) if sel else {}
+                return Result(
+                    channel="snapshot-direct",
+                    action=action,
+                    action_result=action_result,
+                    semantic_anchor=anchor,
+                )
 
             # Low-confidence or action needs extra args → ask the LLM
             msg: dict[str, Any] = {
@@ -103,11 +120,25 @@ class AuthorMode:
             response = self._llm.complete([msg], ACTION_TOOLS, role="author")
             action = parse_tool_call(response)
             action_result = await _dispatch(executor, action)
-            return Result(channel="snapshot-llm", action=action, action_result=action_result)
+            sel = _selector_from_action(action)
+            anchor = await SemanticAnchor.extract(page, sel) if sel else {}
+            return Result(
+                channel="snapshot-llm",
+                action=action,
+                action_result=action_result,
+                semantic_anchor=anchor,
+            )
 
         # Vision channel
         vision_msg = await VisionInput.build(page, step.description)
         response = self._llm.complete([vision_msg], ACTION_TOOLS, role="vision")
         action = parse_tool_call(response)
         action_result = await _dispatch(executor, action)
-        return Result(channel="vision-llm", action=action, action_result=action_result)
+        sel = _selector_from_action(action)
+        anchor = await SemanticAnchor.extract(page, sel) if sel else {}
+        return Result(
+            channel="vision-llm",
+            action=action,
+            action_result=action_result,
+            semantic_anchor=anchor,
+        )

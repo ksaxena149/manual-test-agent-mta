@@ -29,6 +29,27 @@ async def test_snapshot_direct_skips_llm() -> None:
             await browser.close()
 
 
+async def test_result_includes_semantic_anchor() -> None:
+    """Result.semantic_anchor is populated with dict containing the three string fields."""
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.set_content("<div>Context <button id='s'>Submit</button></div>")
+
+            llm = Mock(spec=LLMClient)
+            mode = AuthorMode(llm_client=llm, arbiter=Arbiter())
+            step = Step(action="click", description="click the submit button")
+
+            result = await mode.resolve_and_run(page, step)
+
+            assert isinstance(result.semantic_anchor, dict)
+            assert set(result.semantic_anchor.keys()) == {"parent_text", "sibling_text", "nearby_labels"}
+            assert isinstance(result.semantic_anchor["parent_text"], str)
+        finally:
+            await browser.close()
+
+
 async def test_vision_llm_sends_image_message() -> None:
     """Visual keyword in step → vision-llm; LLM receives multimodal message with image."""
     async with async_playwright() as pw:
