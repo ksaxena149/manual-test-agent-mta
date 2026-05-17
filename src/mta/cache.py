@@ -1,4 +1,4 @@
-"""Cache writer for MTA author mode.
+"""Cache reader/writer for MTA author and replay modes.
 
 CacheEntry schema: { step_index, description, action_type, selector, semantic_anchor }
 Cache file path rule: test_path.with_suffix('.mta.json') — same directory, same stem.
@@ -13,6 +13,10 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+
+class CacheError(Exception):
+    """Raised when a cache file is malformed."""
 
 
 @dataclass
@@ -50,3 +54,31 @@ class CacheWriter:
         except Exception:
             os.unlink(tmp)
             raise
+
+
+class CacheReader:
+    """Load a per-test JSON cache from disk into typed CacheEntry objects."""
+
+    @staticmethod
+    def load(test_path: Path) -> list[CacheEntry]:
+        cache_path = test_path.with_suffix(".mta.json")
+        if not cache_path.exists():
+            return []
+        raw = json.loads(cache_path.read_text())
+        entries: list[CacheEntry] = []
+        for i, item in enumerate(raw):
+            try:
+                entries.append(
+                    CacheEntry(
+                        step_index=item["step_index"],
+                        description=item["description"],
+                        action_type=item["action_type"],
+                        selector=item["selector"],
+                        semantic_anchor=item.get("semantic_anchor", {}),
+                    )
+                )
+            except (KeyError, TypeError) as exc:
+                raise CacheError(
+                    f"{cache_path}: entry {i} is malformed — {exc}"
+                ) from exc
+        return entries
