@@ -3,8 +3,13 @@
 Covers issue 025 acceptance criteria:
   - `mta run path/to/steps.md` runs to completion
   - Exit code reflects pass/fail
-  - Default output is one line per step: `[index] [status] description`
+  - Default output is one line per step: `[index] [mode] [status] description`
   - Integration: pre-baked cache + local HTML page → exit 0
+
+Covers issue 027 acceptance criteria:
+  - Mode tag (llm/cache/heal) appears in each step line
+  - Mode column is fixed-width (5 chars)
+  - Summary footer prints counts per mode
 """
 
 from __future__ import annotations
@@ -16,7 +21,98 @@ from pathlib import Path
 
 import logging
 
-from mta.cli import _verbosity_to_level, build_parser
+from mta.author import Result
+from mta.cli import _print_summary, _verbosity_to_level, build_parser
+from mta.executor import ActionResult
+from mta.orchestrator import RunResult
+from mta.parser import Step as ParsedStep
+from mta.tools import Action
+
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_result(mode: str = "llm", success: bool = True) -> Result:
+    return Result(
+        channel="cache",
+        action=Action(action_type="click", args={"selector": "#btn"}),
+        action_result=ActionResult(
+            success=success,
+            action="click",
+            selector="#btn",
+            duration_ms=10.0,
+            error=None,
+        ),
+        mode=mode,
+    )
+
+
+def _make_run_result(
+    results: list[Result], mode: str = "replay"
+) -> RunResult:
+    return RunResult(
+        mode=mode,  # type: ignore[arg-type]
+        test_path=Path("test.md"),
+        step_results=results,
+        cache_entries=[],
+    )
+
+
+# ---------------------------------------------------------------------------
+# _print_summary unit tests (issue 027)
+# ---------------------------------------------------------------------------
+
+
+def test_print_summary_step_line_contains_mode_tag(capsys: object) -> None:
+    parsed = [ParsedStep(index=0, description="click the button")]
+    run_result = _make_run_result([_make_result(mode="cache")])
+    _print_summary(parsed, run_result)
+    out = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "cache" in out
+    assert "[0]" in out
+    assert "PASS" in out
+
+
+def test_print_summary_footer_counts_modes(capsys: object) -> None:
+    parsed = [ParsedStep(index=i, description=f"step {i}") for i in range(3)]
+    results = [
+        _make_result(mode="cache"),
+        _make_result(mode="cache"),
+        _make_result(mode="llm"),
+    ]
+    run_result = _make_run_result(results)
+    _print_summary(parsed, run_result)
+    out = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "2 cache" in out
+    assert "1 llm" in out
+    assert "0 heal" in out
+
+
+def test_print_summary_no_ansi_when_not_tty(capsys: object) -> None:
+    # capsys captures to non-TTY — no ANSI escape codes should appear
+    parsed = [ParsedStep(index=0, description="step a")]
+    run_result = _make_run_result([_make_result(mode="llm")])
+    _print_summary(parsed, run_result)
+    out = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "\x1b[" not in out
+
+
+def test_print_summary_mode_column_is_fixed_width(capsys: object) -> None:
+    # "llm" (3 chars) must be padded to 5 so columns align with "cache" (5 chars)
+    parsed = [
+        ParsedStep(index=0, description="step a"),
+        ParsedStep(index=1, description="step b"),
+    ]
+    results = [_make_result(mode="llm"), _make_result(mode="cache")]
+    run_result = _make_run_result(results)
+    _print_summary(parsed, run_result)
+    out = capsys.readouterr().out  # type: ignore[attr-defined]
+    lines = out.splitlines()
+    step_lines = [l for l in lines if l.startswith("[")]
+    assert "[llm  ]" in step_lines[0]
+    assert "[cache]" in step_lines[1]
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +284,43 @@ def test_run_replay_with_baked_cache_exits_zero(tmp_path: Path) -> None:
     assert "PASS" in result.stdout
     assert "go to page" in result.stdout
     assert "click submit" in result.stdout
+
+
+def test_run_replay_output_includes_mode_tag(tmp_path: Path) -> None:
+    cwd, test_path = _write_fixture_project(tmp_path)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mta", "run", str(test_path)],
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert "[cache]" in result.stdout
+
+
+def test_run_replay_summary_footer_matches_per_step_modes(tmp_path: Path) -> None:
+    # Fixture has 3 cache entries → footer must report 3 cache, 0 heal, 0 llm.
+    cwd, test_path = _write_fixture_project(tmp_path)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mta", "run", str(test_path)],
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert "3 cache" in result.stdout
+    assert "0 heal" in result.stdout
+    assert "0 llm" in result.stdout
 
 
 def test_vv_run_emits_debug_to_stderr(tmp_path: Path) -> None:

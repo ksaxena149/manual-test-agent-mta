@@ -35,6 +35,22 @@ from mta.parser import ParseError, Step as ParsedStep, parse_steps
 from mta.replay import ReplayMode
 
 
+_MODE_COLORS: dict[str, str] = {
+    "cache": "\x1b[32m",  # green
+    "llm":   "\x1b[33m",  # yellow
+    "heal":  "\x1b[36m",  # cyan
+}
+_RESET = "\x1b[0m"
+
+
+def _format_mode(mode: str, use_color: bool) -> str:
+    padded = f"{mode:<5}"
+    if use_color:
+        color = _MODE_COLORS.get(mode, "")
+        return f"{color}[{padded}]{_RESET}"
+    return f"[{padded}]"
+
+
 def _verbosity_to_level(verbosity: int) -> int:
     if verbosity == 0:
         return logging.WARNING
@@ -127,11 +143,21 @@ def _print_summary(parsed: list[ParsedStep], result: RunResult) -> int:
         descriptions.setdefault(entry.step_index, entry.description)
 
     failed = False
+    use_color = sys.stdout.isatty()
+    mode_counts: dict[str, int] = {"llm": 0, "cache": 0, "heal": 0}
     for i, sr in enumerate(result.step_results):
         ok = sr.action_result.success
         status = "PASS" if ok else "FAIL"
+        mode = sr.mode
+        mode_counts[mode] = mode_counts.get(mode, 0) + 1
         desc = descriptions.get(i, sr.action.action_type)
-        print(f"[{i}] {status} {desc}")
+        print(f"[{i}] {_format_mode(mode, use_color)} {status} {desc}")
         if not ok:
             failed = True
+
+    print(
+        f"{mode_counts['cache']} cache · "
+        f"{mode_counts['heal']} heal · "
+        f"{mode_counts['llm']} llm"
+    )
     return 1 if failed else 0
