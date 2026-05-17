@@ -66,6 +66,7 @@ class Orchestrator:
                 action_type=result.action.action_type,
                 selector=_selector_arg(result.action),
                 semantic_anchor=result.semantic_anchor,
+                args=dict(result.action.args),
             )
             writer.append(entry)
             results.append(result)

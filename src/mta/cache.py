@@ -26,6 +26,7 @@ class CacheEntry:
     action_type: str
     selector: str
     semantic_anchor: dict[str, Any] = field(default_factory=dict)
+    args: dict[str, Any] = field(default_factory=dict)
 
 
 class CacheWriter:
@@ -75,6 +76,7 @@ class CacheReader:
                         action_type=item["action_type"],
                         selector=item["selector"],
                         semantic_anchor=item.get("semantic_anchor", {}),
+                        args=item.get("args", {}),
                     )
                 )
             except (KeyError, TypeError) as exc:

@@ -36,10 +36,13 @@ DIRECT_ACTIONS: frozenset[str] = frozenset({"click", "check", "uncheck", "assert
 
 @dataclass
 class Result:
-    channel: str  # "snapshot-direct" | "snapshot-llm" | "vision-llm"
+    channel: str  # "snapshot-direct" | "snapshot-llm" | "vision-llm" | "cache" | "heal"
     action: Action
     action_result: ActionResult
     semantic_anchor: dict[str, str] = field(default_factory=dict)
+    # Cost bucket surfaced to the reporter (issue 027): "llm" | "cache" | "heal".
+    # Author paths default to "llm"; replay sets "cache"; heal will set "heal".
+    mode: str = "llm"
 
 
 def _selector_from_action(action: Action) -> str | None:
