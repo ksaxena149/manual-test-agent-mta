@@ -20,7 +20,11 @@ visible in tests (mock the client, assert .complete is never called).
 
 from __future__ import annotations
 
+import logging
+
 from playwright.async_api import Page
+
+logger = logging.getLogger(__name__)
 
 from mta.author import Result, _dispatch
 from mta.cache import CacheEntry
@@ -38,6 +42,7 @@ class ReplayMode:
         executor = Executor(page, max_retries=self._max_retries)
         results: list[Result] = []
         for entry in entries:
+            logger.debug("replay step=%d action=%s", entry.step_index, entry.action_type)
             args = entry.args or (
                 {"selector": entry.selector} if entry.selector else {}
             )

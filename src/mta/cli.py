@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -34,12 +35,37 @@ from mta.parser import ParseError, Step as ParsedStep, parse_steps
 from mta.replay import ReplayMode
 
 
+def _verbosity_to_level(verbosity: int) -> int:
+    if verbosity == 0:
+        return logging.WARNING
+    if verbosity == 1:
+        return logging.INFO
+    return logging.DEBUG
+
+
+def _configure_logging(verbosity: int) -> None:
+    level = _verbosity_to_level(verbosity)
+    logger = logging.getLogger("mta")
+    logger.setLevel(level)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(level)
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    logger.addHandler(handler)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mta", description="Manual Test Agent")
     parser.add_argument("--version", action="version", version=f"mta {__version__}")
     sub = parser.add_subparsers(dest="command")
     run_p = sub.add_parser("run", help="Run a markdown/txt step file")
     run_p.add_argument("file", type=Path, help="Path to numbered step file")
+    run_p.add_argument(
+        "-v",
+        dest="verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v INFO, -vv DEBUG)",
+    )
     return parser
 
 
@@ -47,11 +73,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "run":
-        sys.exit(_run(args.file))
+        sys.exit(_run(args.file, getattr(args, "verbose", 0)))
     parser.print_help()
 
 
-def _run(test_path: Path) -> int:
+def _run(test_path: Path, verbosity: int = 0) -> int:
+    _configure_logging(verbosity)
     if not test_path.exists():
         print(f"error: file not found: {test_path}", file=sys.stderr)
         return 2

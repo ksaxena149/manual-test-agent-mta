@@ -8,11 +8,14 @@ Writes are atomic: full rewrite to a temp file, then os.replace.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class CacheError(Exception):
@@ -42,6 +45,7 @@ class CacheWriter:
         return []
 
     def append(self, entry: CacheEntry) -> None:
+        logger.debug("cache append step=%d action=%s", entry.step_index, entry.action_type)
         self._entries.append(asdict(entry))
         self._write()
 
@@ -83,4 +87,5 @@ class CacheReader:
                 raise CacheError(
                     f"{cache_path}: entry {i} is malformed — {exc}"
                 ) from exc
+        logger.debug("loaded %d entries from %s", len(entries), cache_path)
         return entries

@@ -14,7 +14,26 @@ import subprocess
 import sys
 from pathlib import Path
 
-from mta.cli import build_parser
+import logging
+
+from mta.cli import _verbosity_to_level, build_parser
+
+
+# ---------------------------------------------------------------------------
+# verbosity level mapping (unit)
+# ---------------------------------------------------------------------------
+
+
+def test_verbosity_zero_maps_to_warning() -> None:
+    assert _verbosity_to_level(0) == logging.WARNING
+
+
+def test_verbosity_one_maps_to_info() -> None:
+    assert _verbosity_to_level(1) == logging.INFO
+
+
+def test_verbosity_two_maps_to_debug() -> None:
+    assert _verbosity_to_level(2) == logging.DEBUG
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +60,16 @@ def test_version_string_matches_package() -> None:
         text=True,
     )
     assert mta.__version__ in result.stdout or mta.__version__ in result.stderr
+
+
+def test_run_subcommand_parses_v_flag() -> None:
+    args = build_parser().parse_args(["run", "-v", "f.md"])
+    assert args.verbose == 1
+
+
+def test_run_subcommand_parses_vv_flag() -> None:
+    args = build_parser().parse_args(["run", "-vv", "f.md"])
+    assert args.verbose == 2
 
 
 def test_run_subcommand_parses_file_argument() -> None:
@@ -159,6 +188,23 @@ def test_run_replay_with_baked_cache_exits_zero(tmp_path: Path) -> None:
     assert "PASS" in result.stdout
     assert "go to page" in result.stdout
     assert "click submit" in result.stdout
+
+
+def test_vv_run_emits_debug_to_stderr(tmp_path: Path) -> None:
+    cwd, test_path = _write_fixture_project(tmp_path)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mta", "run", "-vv", str(test_path)],
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, (
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert "DEBUG" in result.stderr
 
 
 def test_run_missing_config_errors(tmp_path: Path) -> None:
